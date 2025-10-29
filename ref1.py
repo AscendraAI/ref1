@@ -147,16 +147,38 @@ st.markdown("PDF 파일을 업로드하고 내용에 관해 질문해보세요!"
 
 # 사이드바 설정
 with st.sidebar:
-    st.markdown('<h2 style="color: #1f77b4;">API 키 설정</h2>', unsafe_allow_html=True)
-    api_key = st.text_input("OpenAI API 키를 입력하세요", type="password", help="OpenAI API 키를 입력하세요")
+    st.markdown('<h2 style="color: #1f77b4;">🔐 API 키 설정</h2>', unsafe_allow_html=True)
     
-    # API 키가 입력되었는지 확인
-    if not api_key:
-        st.warning("API 키를 입력해주세요.")
+    # API 키 입력 필드
+    # 세션에 키가 있으면 힌트 표시, 없으면 빈 값
+    placeholder = "sk-..." if st.session_state.get("openai_api_key") else ""
+    api_key = st.text_input(
+        "OpenAI API 키를 입력하세요", 
+        type="password", 
+        value="",  # 보안을 위해 항상 빈 값으로 시작
+        placeholder=placeholder,
+        help="OpenAI API 키를 입력하세요. Streamlit Cloud에서는 여기에 직접 입력하세요.",
+        key="api_key_input"
+    )
+    
+    # API 키 저장 및 확인
+    if api_key and api_key.strip():
+        # 세션 상태에 저장
+        previous_key = st.session_state.get("openai_api_key", "")
+        if api_key != previous_key:
+            st.session_state.openai_api_key = api_key
+            if previous_key:  # 이전에 키가 있었던 경우에만 메시지 표시
+                st.success("✅ API 키가 업데이트되었습니다.")
+        # 환경 변수 설정 (항상 최신 값으로 업데이트)
+        os.environ["OPENAI_API_KEY"] = st.session_state.openai_api_key
+    elif "openai_api_key" in st.session_state and st.session_state.openai_api_key:
+        # 입력 필드가 비어있지만 세션에는 키가 있는 경우 (환경 변수 유지)
+        os.environ["OPENAI_API_KEY"] = st.session_state.openai_api_key
+    else:
+        # API 키가 없는 경우
+        st.warning("⚠️ API 키를 입력해주세요.")
+        st.info("💡 Streamlit Cloud에서는 환경 변수를 직접 설정할 수 없으므로 여기에서 입력하세요.")
         st.stop()
-    
-    # API 키를 환경변수로 설정
-    os.environ["OPENAI_API_KEY"] = api_key
     
     st.markdown('<h2 style="color: #1f77b4;">PDF 파일 업로드</h2>', unsafe_allow_html=True)
     uploaded_files = st.file_uploader("PDF 파일을 선택하세요", type="pdf", accept_multiple_files=True)
@@ -287,10 +309,10 @@ if prompt := st.chat_input("질문을 입력하세요"):
     with st.chat_message("user"):
         st.write(prompt)
     
-    if not api_key:
+    if not st.session_state.get("openai_api_key"):
         with st.chat_message("assistant"):
-            st.write("먼저 API 키를 입력해주세요.")
-        st.session_state.chat_history.append({"role": "assistant", "content": "먼저 API 키를 입력해주세요."})
+            st.write("먼저 사이드바에서 API 키를 입력해주세요.")
+        st.session_state.chat_history.append({"role": "assistant", "content": "먼저 사이드바에서 API 키를 입력해주세요."})
     elif st.session_state.retriever is None:
         with st.chat_message("assistant"):
             st.write("먼저 PDF 파일을 업로드하고 처리해주세요.")
